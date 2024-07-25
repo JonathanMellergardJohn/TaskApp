@@ -1,0 +1,80 @@
+﻿@page "/"
+@rendermode InteractiveServer
+
+<div class="bg-white mt-16 pt-4 pb-8 mx-auto max-w-md overflow-hidden rounded-lg shadow-lg">
+    <div class="px-4 py-2 flex justify-center">
+        <h1 class="text-gray-800 text-2xl font-bold uppercase">Listor</h1>
+    </div>
+    <div class="px-4 py-2 mx-auto w-full max-w-sm">
+        <div class="border-orange-500 py-2 flex items-center border-b-2">
+            <input @bind="newListName" class="bg-transparent text-gray-700 mr-3 py-1 px-2 w-full appearance-none border-none leading-tight focus:outline-none"
+                   type="text" placeholder="Ny lista">
+            <button @onclick="AddList" class="bg-orange-500 border-orange-500 text-white py-1 px-2 flex-shrink-0 rounded border-4 text-sm hover:bg-orange-700 hover:border-orange-700">
+                Lägg till
+            </button>
+        </div>
+    </div>
+
+    <div class="px-4 py-2 mx-auto w-full max-w-sm flex flex-col">
+        @if(lists != null)
+        {
+            foreach(var list in lists)
+            {
+                <NavLink href="@CreateListUrl(list.Id, list.Name)" class="bg-teal-500 border-teal-500 text-white my-2 py-1 px-2 flex-shrink-0 rounded border-4 text-lg hover:bg-teal-700 hover:border-teal-700">
+                    @list.Name
+                </NavLink>
+            }
+        }
+    </div>
+</div>
+
+@using TaskUI.Models
+@using System.Net.Http.Json
+@inject IHttpClientFactory _clientFactory
+
+@code {
+    private string newListName;
+    private List<TaskList> lists;
+    string errorMsg;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            HttpClient client = _clientFactory.CreateClient();
+            lists = await client.GetFromJsonAsync<List<TaskList>>("https://localhost:7229/Lists");
+            Console.WriteLine("Successful fetch of data from API!");
+        }
+        catch (HttpRequestException httpEx)
+        {
+            errorMsg = $"Error getting the data: {httpEx.Message}";
+            Console.WriteLine(errorMsg);
+        }
+        catch (NotSupportedException ex)
+        {
+            errorMsg = $"The content type is not supported: {ex.Message}";
+        }
+    }
+
+    private string CreateListUrl(int id, string name)
+    {
+        return $"/list/{id}?name={name}";
+    }
+
+    private async Task AddList()
+    {
+        HttpClient client = _clientFactory.CreateClient();
+        TaskList newList = new TaskList { Name = newListName };
+
+        var response = await client.PostAsJsonAsync("https://localhost:7229/Lists", newList);
+
+        if (response.IsSuccessStatusCode)
+        {
+            Console.WriteLine("Successfully added a new list.");
+        }
+        else
+        {
+            Console.WriteLine($"Failed to add a new list. Status code: {response.StatusCode}");
+        }
+    }
+}

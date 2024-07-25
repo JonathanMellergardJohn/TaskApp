@@ -1,0 +1,113 @@
+﻿@page "/list/{id:int}"
+@using System.Globalization
+@rendermode InteractiveServer
+
+<div class="bg-white mt-16 mx-auto max-w-md overflow-hidden rounded-lg shadow-lg">
+    <div class="px-4 py-2">
+        <h1 class="text-gray-800 text-2xl font-bold uppercase">@listName</h1>
+    </div>
+    <div class="px-4 py-2 mx-auto w-full max-w-sm">
+        <div class="border-teal-500 py-2 flex items-center border-b-2">
+            <input @bind="newTaskName" class="bg-transparent text-gray-700 mr-3 py-1 px-2 w-full appearance-none border-none leading-tight focus:outline-none"
+                   type="text" placeholder="Ny plats för affisch">
+            <button @onclick="AddTask" class="bg-teal-500 border-teal-500 text-white py-1 px-2 flex-shrink-0 rounded border-4 text-sm hover:bg-teal-700 hover:border-teal-700">
+                Lägg till
+            </button>
+        </div>
+    </div>
+    <ul class="divide-gray-200 px-4 divide-y">
+        @if(taskItems != null)
+        {
+            @foreach (var task in taskItems)
+            {
+                <li class="py-4">
+                    <div class="flex items-center justify-between">
+                        <input  @onchange="@(async (e) => await ToogleStatus(task))"
+                                checked="@task.IsCompleted"
+                                id="task-@task.Id"
+                                type="checkbox"
+                                class="h-4 w-4 text-teal-600 border-gray-300 rounded focus:ring-teal-500">
+                        <label for="1" class="ml-3 text-gray-900 block">
+                            <span class="text-lg font-medium">@task.Name</span>
+                        </label>
+                        <a class="ml-5" href="@($"https://www.google.com/maps/search/?api=1&query={string.Format(CultureInfo.InvariantCulture, "{0}", task.Latitude)},{string.Format(CultureInfo.InvariantCulture, "{0}", task.Longitude)}")">
+                            <span>
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-geo-alt-fill" viewBox="0 0 16 16">
+                                    <path d="M8 16s6-5.686 6-10A6 6 0 0 0 2 6c0 4.314 6 10 6 10m0-7a3 3 0 1 1 0-6 3 3 0 0 1 0 6" />
+                                </svg>
+                            </span>
+                        </a>
+                        <NavLink class="ml-5" href="#">
+                            <span>
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-pencil-square" viewBox="0 0 16 16">
+                                    <path d="M15.502 1.94a.5.5 0 0 1 0 .706L14.459 3.69l-2-2L13.502.646a.5.5 0 0 1 .707 0l1.293 1.293zm-1.75 2.456-2-2L4.939 9.21a.5.5 0 0 0-.121.196l-.805 2.414a.25.25 0 0 0 .316.316l2.414-.805a.5.5 0 0 0 .196-.12l6.813-6.814z" />
+                                    <path fill-rule="evenodd" d="M1 13.5A1.5 1.5 0 0 0 2.5 15h11a1.5 1.5 0 0 0 1.5-1.5v-6a.5.5 0 0 0-1 0v6a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5v-11a.5.5 0 0 1 .5-.5H9a.5.5 0 0 0 0-1H2.5A1.5 1.5 0 0 0 1 2.5z" />
+                                </svg>
+                            </span>
+                        </NavLink>
+                    </div>
+                </li>
+            }
+        }        
+    </ul>
+</div>
+
+@using Microsoft.AspNetCore.WebUtilities
+@using TaskUI.Models
+@using System.Net.Http.Json
+@inject NavigationManager _navigation
+@inject IHttpClientFactory _clientFactory
+    @inject IJSRuntime _js
+@code {
+    [Parameter]
+    public int Id { get; set; }
+    private string listName;
+    private string newTaskName;
+    private List<TaskItem> taskItems;
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        var uri = _navigation.ToAbsoluteUri(_navigation.Uri);
+        var queryParams = QueryHelpers.ParseQuery(uri.Query);
+
+        if(queryParams.TryGetValue("name", out var nameValue))
+        {
+            listName = nameValue;
+        }
+
+        HttpClient client = _clientFactory.CreateClient();
+        taskItems = await client.GetFromJsonAsync<List<TaskItem>>($"https://localhost:7229/TaskItems/Lists/{Id}");
+    }
+    private async Task AddTask()
+    {
+        HttpClient client = _clientFactory.CreateClient();
+        Location location = await GetLocation();
+        Console.WriteLine("In 'AddTask', just past method 'getLocation()'...");
+        TaskItem newTask = new TaskItem { Name = newTaskName, ListId = Id, Latitude = location.Latitude, Longitude = location.Longitude };
+
+        var response = await client.PostAsJsonAsync("https://localhost:7229/TaskItems", newTask);
+
+        if (response.IsSuccessStatusCode)
+        {
+            Console.WriteLine("Successfully added a new task.");
+        }
+        else
+        {
+            Console.WriteLine($"Failed to add a new task. Status code: {response.StatusCode}");
+        }
+    }
+    private async Task ToogleStatus(TaskItem taskItem)
+    {
+        HttpClient client = _clientFactory.CreateClient();
+        taskItem.IsCompleted = !taskItem.IsCompleted;
+
+        var response = await client.PutAsJsonAsync("https://localhost:7229/TaskItems", taskItem);
+    }
+    private async Task<Location> GetLocation()
+    {
+        Location location = await _js.InvokeAsync<Location>("getLocationPromise");
+
+        return location;
+    }
+}
