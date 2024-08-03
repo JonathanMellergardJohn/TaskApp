@@ -71,6 +71,9 @@
         if (response.IsSuccessStatusCode)
         {
             Console.WriteLine("Successfully added a new list.");
+            lists = await client.GetFromJsonAsync<List<TaskList>>("https://localhost:7229/Lists");
+
+            StateHasChanged();
         }
         else
         {

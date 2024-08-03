@@ -91,6 +91,10 @@
         if (response.IsSuccessStatusCode)
         {
             Console.WriteLine("Successfully added a new task.");
+
+            taskItems = await client.GetFromJsonAsync<List<TaskItem>>($"https://localhost:7229/TaskItems/Lists/{Id}");
+
+            StateHasChanged();
         }
         else
         {
